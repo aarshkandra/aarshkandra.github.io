@@ -15,15 +15,15 @@ These can invalidate the plan, so do them first.
 4. Pick hosting (Q1) and a domain/subdomain for TLS.
 5. Raspberry Pi (or any always-on LAN device) available, on Ethernet.
 
-## Phase 1 — Architecture ✅ (this PR)
+## Phase 1 — Architecture ✅ (approved)
 Deliverables: architecture.md, rustdesk.md, database-schema.md, api-spec.md, implementation-plan.md,
-THIRD_PARTY_LICENSES.md (draft). **Awaiting approval.**
+THIRD_PARTY_LICENSES.md (draft).
 
-## Phase 2 — Backend (Fastify/TS/Postgres)
+## Phase 2 — Backend (Fastify/TS/Postgres) ✅ implemented — see [backend.md](backend.md)
 2a monorepo scaffold (pnpm, TS strict, lint, CI) · 2b `packages/protocol` (schemas, envelope
 sign/verify, test vectors) · 2c DB migrations · 2d auth (Argon2id, JWT, refresh rotation, TOTP, lockout)
 · 2e devices + pairing · 2f WS gateway + presence + state machine · 2g command broker + audit · 2h Docker Compose (backend+postgres+Caddy; hbbs/hbbr stubbed until Phase 5).
-Tests: unit (auth, pairing limits, token expiry/reuse, state machine property tests, envelope signing), integration with real Postgres (Testcontainers) and fake agent over WS.
+Tests: unit (auth, pairing limits, token expiry/reuse, state machine property tests, envelope signing), integration against a real PostgreSQL with fake agents speaking the real WS protocol.
 Exit: scripted "fake agent" pairs, heartbeats, goes offline, receives signed commands; invalid auth ⇒ `ACCESS_DENIED`.
 
 ## Phase 3 — Desktop Agent (.NET 8)

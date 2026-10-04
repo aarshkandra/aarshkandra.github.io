@@ -1,0 +1,28 @@
+name: aarsh-remote-ci
+on:
+  push: { paths: ["aarsh-remote/**", ".github/workflows/aarsh-remote-ci.yml"] }
+  pull_request: { paths: ["aarsh-remote/**"] }
+defaults: { run: { working-directory: aarsh-remote } }
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 10
+    env:
+      TEST_ADMIN_DATABASE_URL: postgres://postgres:postgres@localhost:5433/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm, cache-dependency-path: aarsh-remote/pnpm-lock.yaml }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm audit --prod --audit-level high

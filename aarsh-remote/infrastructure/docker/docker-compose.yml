@@ -1,0 +1,52 @@
+# Phase 2 stack: backend + postgres + caddy (TLS).
+# hbbs/hbbr (RustDesk) are added in Phase 5 after the verification checklist in docs/rustdesk.md.
+# Run from this directory:  docker compose --env-file .env up -d --build
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aarsh
+      POSTGRES_USER: aarsh
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aarsh -d aarsh"]
+      interval: 5s
+      retries: 10
+    # no published ports: only reachable from the compose network
+
+  backend:
+    build: { context: ../.., dockerfile: infrastructure/docker/Dockerfile.backend }
+    restart: unless-stopped
+    depends_on: { postgres: { condition: service_healthy } }
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      TRUST_PROXY: "true"
+      DATABASE_URL: postgres://aarsh:${POSTGRES_PASSWORD}@postgres:5432/aarsh
+      SERVER_ORIGIN: ${SERVER_ORIGIN:?}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?}
+      COMMAND_SIGNING_KEY: ${COMMAND_SIGNING_KEY:?}
+      TOTP_ENC_KEY: ${TOTP_ENC_KEY:?}
+      PEPPER: ${PEPPER:?}
+      REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-false}
+      REQUIRE_TOTP_FOR_COMMANDS: ${REQUIRE_TOTP_FOR_COMMANDS:-true}
+      MIN_AGENT_VERSION: ${MIN_AGENT_VERSION:-0.1.0}
+      RUSTDESK_ID_SERVER: ${RUSTDESK_ID_SERVER:-}
+      RUSTDESK_RELAY_SERVER: ${RUSTDESK_RELAY_SERVER:-}
+      RUSTDESK_PUBLIC_KEY: ${RUSTDESK_PUBLIC_KEY:-}
+    # no published ports: only Caddy talks to it
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [backend]
+    ports: ["80:80", "443:443"]
+    environment: { DOMAIN: "${DOMAIN:?}" }
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes: { pgdata: {}, caddy_data: {}, caddy_config: {} }

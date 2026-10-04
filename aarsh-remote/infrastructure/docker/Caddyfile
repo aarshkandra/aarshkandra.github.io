@@ -1,0 +1,9 @@
+{$DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	# REST + both WebSocket endpoints. Caddy handles Upgrade transparently.
+	reverse_proxy backend:8080
+}

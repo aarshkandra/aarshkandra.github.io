@@ -1,0 +1,38 @@
+{
+  "serverPublicKeyRaw": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w=",
+  "agentPublicKeyRaw": "gTl3Dqh9F19Wo1Rmw0x+zMuNipG07jeiXfYPW4/Js5Q=",
+  "canonical": {
+    "input": {
+      "b": [
+        2,
+        1,
+        {
+          "z": null,
+          "a": "x"
+        }
+      ],
+      "a": true
+    },
+    "output": "{\"a\":true,\"b\":[2,1,{\"a\":\"x\",\"z\":null}]}"
+  },
+  "helloChallenge": {
+    "nonce": "BBBBBBBBBBBBBBBBBBBBBB==",
+    "deviceUuid": "11111111-1111-4111-8111-111111111111",
+    "serverOrigin": "https://remote.example.com",
+    "ts": 1790000000
+  },
+  "helloSig": "1Y6GhAck1jxK/Z0Js29f3ILcyn0yF+vu/L2z+r88cuRNjJN44V7Xx7ijJrO2Q+yfGjdawEqmUkTvBsvYUUDHDw==",
+  "pinnedBody": {
+    "type": "command",
+    "id": "22222222-2222-4222-8222-222222222222",
+    "cmd": "RESTART",
+    "args": {
+      "delaySeconds": 5
+    },
+    "issuedAt": 1790000000,
+    "expiresAt": 1790000030,
+    "nonce": "AAAAAAAAAAAAAAAAAAAAAA==",
+    "deviceUuid": "11111111-1111-4111-8111-111111111111"
+  },
+  "deviceUuid": "11111111-1111-4111-8111-111111111111"
+}

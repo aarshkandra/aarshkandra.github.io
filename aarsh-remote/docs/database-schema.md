@@ -1,6 +1,6 @@
 # Database Schema (PostgreSQL 16)
 
-Migrations via `node-pg-migrate`. All timestamps `timestamptz` (UTC). IDs are UUIDv7/`gen_random_uuid()`.
+**Source of truth: [`infrastructure/postgres/migrations/001_init.sql`](../infrastructure/postgres/migrations/001_init.sql)** (applied by the built-in forward-only SQL migrator, `pnpm --filter @aarsh/backend migrate`; also runs on server start unless `AUTO_MIGRATE=false`). The SQL block below was the Phase 1 draft; the differences are listed after it. All timestamps `timestamptz` (UTC). IDs are UUIDv7/`gen_random_uuid()`.
 Secrets are never stored in plaintext: passwords → Argon2id hash; refresh tokens, pairing codes,
 recovery codes → HMAC/SHA-256 hash; TOTP secret → AES-256-GCM ciphertext; devices → **public key only**.
 
@@ -186,3 +186,17 @@ CREATE TABLE device_metrics (
 
 Changes vs. spec's minimum list: added `device_wake_routes`, `used_nonces`, `device_metrics`
 (optional), and revocation/pause columns on `devices`. `device_credentials` also serves Wake Agents.
+
+## Phase 2 deviations from the draft above (implemented in 001_init.sql)
+
+| Change | Reason |
+|---|---|
+| Plain SQL migrator instead of `node-pg-migrate` | One fewer dependency; we only need forward-only, transactional, advisory-locked migrations |
+| `devices.owner_id` is `NOT NULL`; devices are created **at pairing claim**, not at agent install | An unclaimed agent has no owner; the pending state lives in `device_pairings` |
+| `device_pairings.kind` (`DESKTOP`/`WAKE`) and `paired_id` added | Same pairing flow for PCs and Wake Agents; lets the agent poll for completion |
+| `devices.deleted_at` added | `DELETE /devices/:id` is a soft delete (revokes + hides, keeps audit history) |
+| `users.totp_last_step` added | TOTP replay protection (a code is single-use per 30 s step) |
+| `refresh_tokens.totp_verified` added | The session's TOTP status survives refresh (JWT claim `tv`) |
+| `device_wake_routes` has `PRIMARY KEY (device_id)` | One wake agent per device in v1 |
+| `audit_logs` append-only via **triggers** on UPDATE/DELETE/TRUNCATE (any role) | Works even though the app connects as a single DB role |
+| `used_nonces` and `device_metrics` **not created** | Challenge nonces are per-connection and in-memory; command replay protection is the agent's job (signed, ≤60 s expiry, unique id); latest metrics are held in memory. Both can be added if history/replay storage is wanted |

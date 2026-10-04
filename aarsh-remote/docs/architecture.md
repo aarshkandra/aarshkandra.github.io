@@ -89,7 +89,8 @@ Modules: `auth`, `users`, `devices`, `pairing`, `presence`, `commands`, `wake`, 
 * **Two WebSocket endpoints:** `/ws/client` (user JWT) and `/ws/agent` (device challenge-response).
   Wake Agents use `/ws/agent` with `kind=wake`.
 * **Presence:** in-memory map keyed by device, backed by `devices.status/last_seen` in Postgres.
-  Heartbeat 15 s; offline after 3 missed (45 s). All state transitions go through the single
+  Heartbeat 15 s; a silent connection is terminated after 45 s. A *closed* socket changes state immediately
+  (`SLEEPING` if the agent sent `GOING_TO_SLEEP` first, else `OFFLINE`); a re-connect replaces the old socket without flapping. All state transitions go through the single
   state-machine module (§6) so they are testable.
 * **Command broker:** validates user + device ownership + device not revoked/paused, writes audit
   row, signs envelope, routes to the right agent, awaits ack with timeout.
@@ -200,6 +201,8 @@ any ──(repeated protocol failure)──► ERROR
 Notes:
 * `CONNECTING/CONNECTED/DISCONNECTED` are per-**session** states layered over the per-**device**
   presence states (ONLINE etc.). A device can be ONLINE with zero sessions.
+* Wake nuance (Phase 2): if the Wake Agent is offline the request is rejected up-front with `503 WAKE_AGENT_UNREACHABLE`,
+  recorded as a FAILED wake request, and the device **stays** SLEEPING/OFFLINE (it is not pushed into ERROR).
 * `ERROR.reason` ∈ `WAKE_AGENT_UNREACHABLE`, `WAKE_NO_RESPONSE` (PC did not appear; likely WoL
   disabled in BIOS/NIC, or S5), `AGENT_AUTH_FAILED`, `REMOTE_DISABLED_LOCALLY`, `RUSTDESK_UNAVAILABLE`.
 * Pure function `(state, event) → state | IllegalTransition`; property-tested.
@@ -234,9 +237,12 @@ travelling, possibly hotel Wi-Fi).
 
 ### 9.2 Authentication
 * **Users:** Argon2id (memory-hard params, per-user salt, server pepper from env), min 12 chars
-  (zxcvbn ≥3), TOTP (RFC 6238) with encrypted-at-rest secret (AES-256-GCM, key from env/KMS-file),
-  10 single-use recovery codes (hashed). **TOTP is mandatory for any command that changes
-  power state or opens a session** in v1 (recommended default; configurable).
+  (zxcvbn ≥3 — *Phase 2 implements length ≥12, a small denylist, no email-name and a repetition check; zxcvbn is a later improvement*),
+  TOTP (RFC 6238) with encrypted-at-rest secret (AES-256-GCM, key from env), 10 single-use recovery codes (HMAC-hashed).
+  **TOTP policy (`REQUIRE_TOTP_FOR_COMMANDS`, default on):** pairing, WAKE, SLEEP and CONNECT require a session that was
+  established with a TOTP-verified login (JWT claim `tv`); RESTART and SHUTDOWN additionally require a **fresh, single-use
+  TOTP code** in the request. A user who has not enrolled TOTP gets `403 TOTP_ENROLLMENT_REQUIRED`, so first-run order is:
+  register → enroll TOTP → log in again → pair devices.
 * **Tokens:** access JWT (EdDSA, 10 min), refresh token opaque 256-bit, stored **hashed**, rotated
   every use with **reuse detection** (reuse ⇒ revoke whole family + audit alert), 30-day absolute.
 * **Devices/Wake Agents:** Ed25519 challenge-response on each WS connect
