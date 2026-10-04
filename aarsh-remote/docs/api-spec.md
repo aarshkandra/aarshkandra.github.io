@@ -98,6 +98,11 @@ Anything else → `400 UNKNOWN_COMMAND`, audited as DENIED. There is **no** gene
 `DEVICE_OFFLINE`, `WAKE_AGENT_UNREACHABLE`, `WAKE_NO_RESPONSE`, `COMMAND_TIMEOUT`, `UNKNOWN_COMMAND`,
 `AGENT_OUTDATED`, `PAIRING_EXPIRED`, `PAIRING_ATTEMPTS_EXCEEDED`.
 
+## Added in Phase 3
+* `GET /api/v1/server-info` (public, non-secret) → `{origin, commandPublicKey (base64 raw Ed25519), minAgentVersion}`. Agents pin `commandPublicKey` at pairing time and compare `origin` with the URL they were configured with.
+* Server → agent: `{type:"heartbeat.ack"}` in reply to every `heartbeat` (liveness for half-open connections; agents drop the link after 3 silent heartbeat periods).
+* Agent `ack` error strings used by the .NET agent: `ENVELOPE_<REASON>`, `REPLAY`, `REMOTE_DISABLED_LOCALLY`, `REMOTE_PAUSED`, `REMOTE_ENGINE_UNAVAILABLE`, `UNSUPPORTED_COMMAND`, `COMMAND_FAILED`.
+
 ## Implementation notes (Phase 2)
 * Base path is `/api/v1`; WebSockets are at `/ws/client` and `/ws/agent`; `/healthz` is unauthenticated and returns `{ok:true}` only.
 * Not-owner and not-found are both `404` (no device enumeration).

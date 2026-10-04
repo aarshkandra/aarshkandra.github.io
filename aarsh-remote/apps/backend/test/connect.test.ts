@@ -62,6 +62,30 @@ describe("connect / disconnect", () => {
   });
 });
 
+describe("server restart", () => {
+  it("clears stale ONLINE/WAKING presence on startup but keeps SLEEPING", async () => {
+    const { resetPresenceOnStartup } = await import("../src/presence.js");
+    await s.db.query("UPDATE devices SET status='ONLINE'");
+    const other = await s.db.query("INSERT INTO devices(device_uuid,name,owner_id,status) SELECT gen_random_uuid(),'b',owner_id,'WAKING' FROM devices LIMIT 1 RETURNING id");
+    const third = await s.db.query("INSERT INTO devices(device_uuid,name,owner_id,status) SELECT gen_random_uuid(),'c',owner_id,'SLEEPING' FROM devices LIMIT 1 RETURNING id");
+    await resetPresenceOnStartup(s.db);
+    const rows = Object.fromEntries((await s.db.query("SELECT name, status, status_reason FROM devices")).rows.map((r) => [r.name, r]));
+    expect(rows["NGP-WORKSTATION"]).toMatchObject({ status: "OFFLINE", status_reason: null });
+    expect(rows["b"]).toMatchObject({ status: "ERROR", status_reason: "WAKE_INTERRUPTED" });
+    expect(rows["c"].status).toBe("SLEEPING");
+    void other; void third;
+  });
+});
+
+describe("server info", () => {
+  it("publishes the command-signing public key (and nothing secret)", async () => {
+    const r = await s.http("GET", "/api/v1/server-info");
+    expect(r.status).toBe(200);
+    expect(Buffer.from(r.body.commandPublicKey, "base64")).toHaveLength(32);
+    expect(Object.keys(r.body).sort()).toEqual(["commandPublicKey", "minAgentVersion", "origin"]);
+  });
+});
+
 describe("client websocket auth & events", () => {
   it("rejects bad token, no auth message, and tokens of logged-out sessions", async () => {
     const bad = clientWs(s, "garbage-but-long-enough-to-pass-schema");

@@ -37,9 +37,12 @@ docker compose --env-file .env up -d --build
 ```
 Postgres and the backend publish no ports; only Caddy listens (80/443, automatic TLS for your domain). The built bundle itself was smoke-tested with `node dist/server.js` against Postgres. Treat the Compose/Dockerfile as unverified until the first real deploy.
 
+## Restart behaviour
+Presence is in memory, so on startup the server clears stale statuses (`ONLINE → OFFLINE`, interrupted `WAKING → ERROR WAKE_INTERRUPTED`, open wake requests `FAILED SERVER_RESTARTED`; `SLEEPING` is kept). Agents reconnect within seconds and flip back to ONLINE. This was found by the end-to-end test: without it a restarted server showed devices ONLINE that nobody had reconnected.
+
 ## Known limitations / follow-ups
 * Single server instance only (in-memory presence/hub, per-instance rate-limit store). Fine for one owner.
 * WebSocket upgrade requests aren't individually rate-limited (they authenticate in-protocol within 5–10 s and are payload-capped at 64 KB).
 * Password policy is length + denylist, not zxcvbn.
 * No `/updates/latest` yet (Phase 8). No admin web dashboard yet.
-* `pnpm audit` is wired into CI but has not been run against the registry from this sandbox — see "Security review" in the Phase 7 plan.
+* `pnpm audit --prod` (no known vulnerabilities) and `dotnet list package --vulnerable` (none) were run during Phase 3 and are wired into CI; the full Phase 7 review is still to come.

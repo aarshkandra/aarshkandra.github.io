@@ -1,6 +1,6 @@
 import type { DeviceStatus } from "@aarsh/protocol";
 import type { Ctx } from "./ctx.js";
-import { tx } from "./db.js";
+import { tx, type Db } from "./db.js";
 import { transition, type DeviceEvent, type DeviceState } from "./state-machine.js";
 
 /** The single place a device's persisted status changes. Throws IllegalTransition if the event is not allowed. */
@@ -23,4 +23,22 @@ export async function applyDeviceEvent(ctx: Ctx, deviceId: string, ev: DeviceEve
     ctx.hub.sendToUser(r.ownerId, { type: "device.state", deviceId, status: r.status, reason: r.reason, lastSeen: new Date().toISOString() });
   }
   return r;
+}
+
+/**
+ * Presence lives in memory, so after a server restart nobody is connected yet. Clear stale statuses so the dashboard never shows
+ * a device ONLINE that nobody can reach; agents reconnect within seconds and flip themselves back.
+ * SLEEPING stays (a sleeping PC cannot be connected). Interrupted wakes become ERROR (their timers died with the process),
+ * and an agent connecting later still moves ERROR → ONLINE.
+ */
+export async function resetPresenceOnStartup(db: Db): Promise<{ devices: number; networkAgents: number }> {
+  const d = await db.query(
+    `UPDATE devices SET
+       status = CASE WHEN status = 'ONLINE' THEN 'OFFLINE'::device_status ELSE 'ERROR'::device_status END,
+       status_reason = CASE WHEN status = 'ONLINE' THEN NULL ELSE 'WAKE_INTERRUPTED' END,
+       updated_at = now()
+     WHERE status IN ('ONLINE','WAKE_REQUESTED','WAKING')`);
+  const n = await db.query("UPDATE network_agents SET status='OFFLINE' WHERE status='ONLINE'");
+  await db.query("UPDATE wake_requests SET status='FAILED', failure_reason='SERVER_RESTARTED', completed_at=now() WHERE status IN ('REQUESTED','SENT','WAKING')");
+  return { devices: d.rowCount ?? 0, networkAgents: n.rowCount ?? 0 };
 }

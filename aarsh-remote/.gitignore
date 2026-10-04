@@ -3,3 +3,8 @@ dist/
 .env
 *.pem
 coverage/
+bin/
+obj/
+publish/
+TestResults/
+*.user

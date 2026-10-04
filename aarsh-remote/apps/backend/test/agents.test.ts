@@ -92,6 +92,13 @@ describe("presence", () => {
     expect(await deviceStatus(s, user, id)).toBe("ONLINE"); // replacing must not flap to OFFLINE
     a.abort();
   });
+  it("answers every heartbeat with heartbeat.ack so agents can detect a dead link", async () => {
+    const a = new FakeAgent(s); const id = await a.pair(user);
+    await a.connect(); await waitStatus(s, user, id, "ONLINE");
+    a.heartbeat();
+    await waitFor(() => a.messages.some((m) => m.type === "heartbeat.ack"), 2000, "ack");
+    a.abort();
+  });
   it("metrics are validated and exposed; junk is ignored", async () => {
     const a = new FakeAgent(s); const id = await a.pair(user);
     await a.connect(); await waitStatus(s, user, id, "ONLINE");

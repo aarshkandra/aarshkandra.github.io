@@ -116,6 +116,8 @@ async function onAuthenticated(ctx: Ctx, c: AgentConn, version: string, info: { 
 async function onAgentMessage(ctx: Ctx, c: AgentConn, m: ReturnType<typeof agentMsg.parse>) {
   switch (m.type) {
     case "heartbeat":
+      // Lets the agent detect a dead link (half-open TCP) by noticing silence; harmless to agents that ignore it.
+      if (c.ws.readyState === 1) c.ws.send(JSON.stringify({ type: "heartbeat.ack" }));
       if (c.kind === "DESKTOP") {
         await ctx.db.query("UPDATE devices SET last_seen=now(), remote_disabled_locally=COALESCE($2, remote_disabled_locally) WHERE id=$1", [c.id, m.remoteDisabled ?? null]);
       } else {

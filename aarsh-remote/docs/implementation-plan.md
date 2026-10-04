@@ -26,7 +26,7 @@ sign/verify, test vectors) · 2c DB migrations · 2d auth (Argon2id, JWT, refres
 Tests: unit (auth, pairing limits, token expiry/reuse, state machine property tests, envelope signing), integration against a real PostgreSQL with fake agents speaking the real WS protocol.
 Exit: scripted "fake agent" pairs, heartbeats, goes offline, receives signed commands; invalid auth ⇒ `ACCESS_DENIED`.
 
-## Phase 3 — Desktop Agent (.NET 8)
+## Phase 3 — Desktop Agent (.NET 8) ✅ implemented, ⚠ awaiting Windows verification — see [windows-agent.md](windows-agent.md)
 Identity+DPAPI · WS client + backoff · heartbeat/status · power events (`GOING_TO_SLEEP`) · metrics ·
 SLEEP/RESTART/SHUTDOWN handlers · emergency flag + pause · logging w/ redaction · tray (basic).
 Dev needs a Windows machine (your PC); CI uses `windows-latest` for build/unit tests. Unit tests mock the OS layer.

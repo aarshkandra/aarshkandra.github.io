@@ -24,20 +24,21 @@ export function envFor(over: Record<string, string> = {}): Record<string, string
 }
 
 export interface TestServer {
-  config: Config; db: Db; ctx: Awaited<ReturnType<typeof buildApp>>["ctx"]; base: string; wsBase: string; close(): Promise<void>;
+  env: Record<string, string>; config: Config; db: Db; ctx: Awaited<ReturnType<typeof buildApp>>["ctx"]; base: string; wsBase: string; close(): Promise<void>;
   http(method: string, path: string, opts?: { token?: string; body?: unknown; headers?: Record<string, string> }): Promise<{ status: number; body: any }>;
 }
 
-export async function startServer(over: Record<string, string> = {}): Promise<TestServer> {
-  const config = loadConfig(envFor(over));
+export async function startServer(over: Record<string, string> = {}, opts: { port?: number; reset?: boolean } = {}): Promise<TestServer> {
+  const env = envFor(over);
+  const config = loadConfig(env);
   const db = createDb(config.DATABASE_URL);
-  await resetDb(db);
+  if (opts.reset !== false) await resetDb(db);
   const { app, ctx } = await buildApp(config, db, { logger: false });
-  await app.listen({ port: 0, host: "127.0.0.1" });
+  await app.listen({ port: opts.port ?? 0, host: "127.0.0.1" });
   const port = (app.server.address() as { port: number }).port;
   const base = `http://127.0.0.1:${port}`;
   return {
-    config, db, ctx, base, wsBase: `ws://127.0.0.1:${port}`,
+    env, config, db, ctx, base, wsBase: `ws://127.0.0.1:${port}`,
     async close() { await app.close(); await db.end(); },
     async http(method, path, opts = {}) {
       const res = await fetch(base + path, {
@@ -173,3 +174,11 @@ export function clientWs(s: TestServer, token: string) {
 }
 
 export { signBytes, pairingPollInput, publicKeyFromRaw };
+
+export async function freePort(): Promise<number> {
+  const { createServer } = await import("node:net");
+  return new Promise((resolve) => {
+    const srv = createServer();
+    srv.listen(0, "127.0.0.1", () => { const p = (srv.address() as { port: number }).port; srv.close(() => resolve(p)); });
+  });
+}
